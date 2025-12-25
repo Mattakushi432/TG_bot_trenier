@@ -4,7 +4,6 @@ IFBB Pro Dual-Coach AI - Telegram Bot
 Персональный ИИ-тренер с использованием Google Gemini API
 """
 
-import asyncio
 import logging
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from config import TELEGRAM_BOT_TOKEN, BOT_NAME, BOT_VERSION

@@ -234,7 +234,7 @@ async def handle_workout_plan(update: Update, context: ContextTypes.DEFAULT_TYPE
     await update.message.reply_text("⏳ Создаю персональный план тренировок...")
     
     try:
-        workout_plan = await gemini.generate_workout_plan(user_data)
+        workout_plan = gemini.generate_workout_plan(user_data)
         
         # Сохраняем план в базу данных
         db.save_workout_plan(user_id, {'plan': workout_plan, 'type': 'workout'})
@@ -257,7 +257,7 @@ async def handle_nutrition_plan(update: Update, context: ContextTypes.DEFAULT_TY
     await update.message.reply_text("⏳ Рассчитываю индивидуальный план питания...")
     
     try:
-        nutrition_plan = await gemini.calculate_nutrition(user_data)
+        nutrition_plan = gemini.calculate_nutrition(user_data)
         await update.message.reply_text(nutrition_plan, parse_mode='Markdown')
         
     except Exception as e:
@@ -276,7 +276,7 @@ async def handle_supplements(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await update.message.reply_text("⏳ Подбираю спортивное питание...")
     
     try:
-        supplements = await gemini.recommend_supplements(user_data)
+        supplements = gemini.recommend_supplements(user_data)
         await update.message.reply_text(supplements, parse_mode='Markdown')
         
     except Exception as e:
@@ -379,7 +379,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if user_data:
                 await update.message.reply_text("⏳ Думаю над ответом...")
                 try:
-                    response = await gemini.generate_response(user_data, text)
+                    response = gemini.generate_response(user_data, text)
                     await update.message.reply_text(response, parse_mode='Markdown')
                 except Exception as e:
                     logger.error(f"Ошибка генерации ответа: {e}")

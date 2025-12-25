@@ -5,7 +5,8 @@ import json
 class GeminiClient:
     def __init__(self):
         genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-pro')
+        # Используем проверенную рабочую модель
+        self.model = genai.GenerativeModel('models/gemini-2.5-flash')
     
     def get_system_prompt(self, user_data):
         """Генерация системного промпта на основе данных пользователя"""
@@ -65,7 +66,7 @@ class GeminiClient:
         
         return system_prompt
     
-    async def generate_response(self, user_data, user_message):
+    def generate_response(self, user_data, user_message):
         """Генерация ответа от Gemini"""
         try:
             system_prompt = self.get_system_prompt(user_data)
@@ -79,9 +80,16 @@ class GeminiClient:
             return response.text
             
         except Exception as e:
-            return f"Произошла ошибка при генерации ответа: {str(e)}"
+            error_msg = str(e)
+            if "404" in error_msg or "not found" in error_msg:
+                return ("Извините, возникла проблема с ИИ-моделью. "
+                       "Попробуйте позже или обратитесь к администратору для обновления настроек.")
+            elif "quota" in error_msg.lower() or "limit" in error_msg.lower():
+                return ("Превышен лимит запросов к ИИ. Попробуйте через несколько минут.")
+            else:
+                return f"Произошла ошибка при генерации ответа. Попробуйте переформулировать вопрос."
     
-    async def generate_workout_plan(self, user_data):
+    def generate_workout_plan(self, user_data):
         """Генерация плана тренировок"""
         prompt = """
         Создай детальный план тренировок на 4 недели в формате таблицы Markdown.
@@ -100,9 +108,13 @@ class GeminiClient:
         4. Рекомендации по прогрессии
         """
         
-        return await self.generate_response(user_data, prompt)
+        try:
+            return self.generate_response(user_data, prompt)
+        except Exception as e:
+            return ("Не удалось создать план тренировок. "
+                   "Попробуйте позже или обратитесь к тренеру лично.")
     
-    async def calculate_nutrition(self, user_data):
+    def calculate_nutrition(self, user_data):
         """Расчет питания и КБЖУ"""
         prompt = """
         Рассчитай индивидуальный план питания с точными значениями КБЖУ.
@@ -119,9 +131,13 @@ class GeminiClient:
         4. Рекомендации по времени приема пищи относительно тренировок
         """
         
-        return await self.generate_response(user_data, prompt)
+        try:
+            return self.generate_response(user_data, prompt)
+        except Exception as e:
+            return ("Не удалось рассчитать план питания. "
+                   "Попробуйте позже или обратитесь к диетологу.")
     
-    async def recommend_supplements(self, user_data):
+    def recommend_supplements(self, user_data):
         """Рекомендации по спортивному питанию"""
         prompt = """
         Порекомендуй спортивные добавки на основе цели и уровня подготовки.
@@ -140,4 +156,8 @@ class GeminiClient:
         4. Приоритет (обязательно/желательно/опционально)
         """
         
-        return await self.generate_response(user_data, prompt)
+        try:
+            return self.generate_response(user_data, prompt)
+        except Exception as e:
+            return ("Не удалось подобрать спортивное питание. "
+                   "Обратитесь к специалисту по спортивному питанию.")
