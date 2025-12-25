@@ -11,6 +11,7 @@ from bot_handlers import (
     start_command, 
     help_command, 
     reset_command,
+    stop_command,
     handle_message
 )
 
@@ -32,6 +33,7 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("reset", reset_command))
+    application.add_handler(CommandHandler("stop", stop_command))
     
     # Обработчик всех текстовых сообщений
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

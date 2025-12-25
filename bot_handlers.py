@@ -2,8 +2,10 @@ from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes
 from database import UserDatabase
 from gemini_client import GeminiClient
+from config import DATABASE_PATH
 import logging
 import re
+import sqlite3
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -506,7 +508,55 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "Для сброса всех данных используй команду /reset"
         )
     else:
-        # Проверяем, обновляет ли пользователь замеры
+        # Проверяем, подтверждает ли пользователь сброс данных
+        if context.user_data.get('confirming_reset'):
+            if text == 'ДА УДАЛИТЬ':
+                user_id = update.effective_user.id
+                
+                # Удаляем пользователя из базы данных
+                try:
+                    with sqlite3.connect(DATABASE_PATH) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute('DELETE FROM users WHERE user_id = ?', (user_id,))
+                        cursor.execute('DELETE FROM progress WHERE user_id = ?', (user_id,))
+                        cursor.execute('DELETE FROM workout_plans WHERE user_id = ?', (user_id,))
+                        conn.commit()
+                    
+                    await update.message.reply_text(
+                        "🗑️ Все данные удалены!\n\n"
+                        "🆕 Теперь ты можешь начать с чистого листа.\n"
+                        "Отправь /start для новой регистрации!",
+                        reply_markup=ReplyKeyboardMarkup([
+                            [KeyboardButton("/start")]
+                        ], resize_keyboard=True)
+                    )
+                    
+                except Exception as e:
+                    logger.error(f"Ошибка удаления данных пользователя {user_id}: {e}")
+                    await update.message.reply_text(
+                        "❌ Произошла ошибка при удалении данных.\n"
+                        "Попробуй позже или обратись к администратору."
+                    )
+            elif "❌ Отмена" in text or text.lower() in ['отмена', 'нет', 'cancel']:
+                await update.message.reply_text(
+                    "✅ Сброс отменен!\n"
+                    "Твои данные в безопасности.",
+                    reply_markup=get_main_keyboard()
+                )
+            else:
+                await update.message.reply_text(
+                    "🤔 Не понял твой ответ.\n\n"
+                    "Напиши 'ДА УДАЛИТЬ' для подтверждения удаления всех данных\n"
+                    "или нажми '❌ Отмена' чтобы оставить все как есть.",
+                    reply_markup=ReplyKeyboardMarkup([
+                        [KeyboardButton("ДА УДАЛИТЬ"), KeyboardButton("❌ Отмена")]
+                    ], resize_keyboard=True)
+                )
+                return
+            
+            # Убираем флаг подтверждения
+            context.user_data.pop('confirming_reset', None)
+            return
         if context.user_data.get('updating_measurements'):
             try:
                 measurements = [float(x.strip()) for x in text.split(',')]
@@ -567,11 +617,62 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Сброс данных пользователя"""
+    user_id = update.effective_user.id
+    user_data = db.get_user(user_id)
+    
+    if not user_data:
+        await update.message.reply_text(
+            "🤔 У тебя еще нет данных для сброса.\n"
+            "Отправь /start чтобы начать регистрацию!"
+        )
+        return
+    
     await update.message.reply_text(
-        "⚠️ Это удалит все твои данные. Уверен?\n\n"
-        "Напиши 'ДА' для подтверждения или любое другое сообщение для отмены."
+        "⚠️ ВНИМАНИЕ! Это удалит ВСЕ твои данные:\n\n"
+        "🗑️ Профиль и настройки\n"
+        "📊 Историю прогресса\n"
+        "🏋️ Сохраненные планы тренировок\n\n"
+        "❓ Ты уверен, что хочешь начать с чистого листа?\n\n"
+        "Напиши 'ДА УДАЛИТЬ' для подтверждения или любое другое сообщение для отмены.",
+        reply_markup=ReplyKeyboardMarkup([
+            [KeyboardButton("ДА УДАЛИТЬ"), KeyboardButton("❌ Отмена")]
+        ], resize_keyboard=True)
     )
     context.user_data['confirming_reset'] = True
+
+async def stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Остановка работы с ботом"""
+    user_id = update.effective_user.id
+    user_data = db.get_user(user_id)
+    
+    if user_data:
+        coach_name = "Ронни Коулман" if user_data['gender'] == 'male' else "Дженет Лайог"
+        goodbye_message = (
+            f"👋 До свидания от {coach_name}!\n\n"
+            "🏆 Помни: чемпионы никогда не сдаются!\n"
+            "💪 Твои данные сохранены и ждут твоего возвращения.\n\n"
+            "🔄 Когда будешь готов продолжить - просто напиши /start\n"
+            "🗑️ Если захочешь начать заново - используй /reset\n\n"
+            "✨ Удачи в достижении твоих целей!"
+        )
+        
+        if user_data['gender'] == 'male':
+            goodbye_message += "\n\n💥 Yeah buddy! Light weight! Увидимся на тренировке!"
+        else:
+            goodbye_message += "\n\n✨ Оставайся сильной и красивой! До встречи!"
+    else:
+        goodbye_message = (
+            "👋 До свидания!\n\n"
+            "Спасибо, что попробовал IFBB Pro Dual-Coach AI!\n"
+            "Возвращайся когда захочешь начать тренироваться! 💪"
+        )
+    
+    # Убираем клавиатуру
+    from telegram import ReplyKeyboardRemove
+    await update.message.reply_text(goodbye_message, reply_markup=ReplyKeyboardRemove())
+    
+    # Помечаем пользователя как неактивного (можно добавить поле в БД)
+    context.user_data.clear()
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Помощь по боту"""
@@ -584,6 +685,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • Рекомендации по спортивному питанию
 • Отслеживание прогресса и замеров
 • Адаптация под твой уровень и цели
+• Учет количества тренировок в неделю (2-5+)
 
 👨‍🏫 Тренеры:
 • Ронни Коулман (для мужчин) - 8x Mr. Olympia
@@ -592,9 +694,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📱 Команды:
 /start - Начать работу с ботом
 /help - Показать эту справку
-/reset - Сбросить все данные
+/reset - Полный сброс данных и перезапуск
+/stop - Остановить работу с ботом
 
-💪 Готов стать лучшей версией себя? Жми /start!
+🎯 Готов стать лучшей версией себя? 
+Если еще не зарегистрирован - жми /start!
+Если хочешь изменить данные - используй /reset!
     """
     
     await update.message.reply_text(help_text)
