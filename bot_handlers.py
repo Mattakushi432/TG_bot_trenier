@@ -390,23 +390,90 @@ async def handle_progress(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     progress_history = db.get_progress_history(user_id)
     
+    def format_measurements(measurements):
+        """Форматирование замеров для красивого отображения"""
+        if not measurements:
+            return "Нет данных"
+        
+        formatted = []
+        labels = {
+            'chest': 'Грудь',
+            'waist': 'Талия', 
+            'hips': 'Бедра',
+            'bicep': 'Бицепс'
+        }
+        
+        for key, value in measurements.items():
+            label = labels.get(key, key.capitalize())
+            formatted.append(f"{label}: {value} см")
+        
+        return "\n".join(formatted)
+    
+    def calculate_changes(old_measurements, new_measurements):
+        """Расчет изменений между замерами"""
+        if not old_measurements or not new_measurements:
+            return ""
+        
+        changes = []
+        labels = {
+            'chest': 'Грудь',
+            'waist': 'Талия', 
+            'hips': 'Бедра',
+            'bicep': 'Бицепс'
+        }
+        
+        for key in new_measurements:
+            if key in old_measurements:
+                old_val = float(old_measurements[key])
+                new_val = float(new_measurements[key])
+                change = new_val - old_val
+                
+                if change != 0:
+                    label = labels.get(key, key.capitalize())
+                    sign = "+" if change > 0 else ""
+                    changes.append(f"{label}: {sign}{change:.1f} см")
+        
+        return "\n".join(changes) if changes else "Нет изменений"
+    
     if not progress_history:
-        await update.message.reply_text(
-            "📊 История прогресса пуста.\n\n"
-            "Текущие данные:\n"
-            f"Вес: {user_data['weight']} кг\n"
-            f"Замеры: {user_data.get('measurements', {})}"
+        current_measurements = format_measurements(user_data.get('measurements', {}))
+        
+        progress_text = (
+            "📊 Твой профиль:\n\n"
+            f"⚖️ Текущий вес: {user_data['weight']} кг\n\n"
+            f"📏 Замеры тела:\n{current_measurements}\n\n"
+            "📈 История изменений пуста.\n"
+            "Обновляй замеры регулярно, чтобы отслеживать прогресс!"
         )
     else:
         progress_text = "📊 Твой прогресс:\n\n"
+        
         for i, record in enumerate(progress_history[:5]):  # Показываем последние 5 записей
-            progress_text += f"📅 {record['date'][:10]}\n"
-            progress_text += f"Вес: {record['weight']} кг\n"
+            date_str = record['date'][:10] if record['date'] else "Неизвестная дата"
+            progress_text += f"📅 {date_str}\n"
+            progress_text += f"⚖️ Вес: {record['weight']} кг\n"
+            
             if record['measurements']:
-                progress_text += f"Замеры: {record['measurements']}\n"
+                measurements_str = format_measurements(record['measurements'])
+                progress_text += f"📏 Замеры:\n{measurements_str}\n"
+                
+                # Показываем изменения относительно предыдущей записи
+                if i < len(progress_history) - 1:
+                    prev_record = progress_history[i + 1]
+                    if prev_record['measurements']:
+                        changes = calculate_changes(prev_record['measurements'], record['measurements'])
+                        if changes and changes != "Нет изменений":
+                            progress_text += f"📈 Изменения:\n{changes}\n"
+            
             progress_text += "\n"
         
-        await update.message.reply_text(progress_text)
+        # Добавляем текущие данные
+        current_measurements = format_measurements(user_data.get('measurements', {}))
+        progress_text += "📋 Текущие данные:\n"
+        progress_text += f"⚖️ Вес: {user_data['weight']} кг\n"
+        progress_text += f"📏 Замеры:\n{current_measurements}"
+    
+    await update.message.reply_text(progress_text)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка текстовых сообщений"""
@@ -461,7 +528,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     # Сохраняем в историю прогресса
                     db.save_progress(user_id, user_data['weight'], new_measurements)
                     
-                    await update.message.reply_text("✅ Замеры обновлены!")
+                    # Красивое отображение обновленных замеров
+                    measurements_text = "\n".join([
+                        f"Грудь: {new_measurements['chest']} см",
+                        f"Талия: {new_measurements['waist']} см", 
+                        f"Бедра: {new_measurements['hips']} см",
+                        f"Бицепс: {new_measurements['bicep']} см"
+                    ])
+                    
+                    success_message = (
+                        "✅ Замеры обновлены!\n\n"
+                        f"📏 Новые замеры:\n{measurements_text}\n\n"
+                        "📊 Данные сохранены в историю прогресса."
+                    )
+                    
+                    await update.message.reply_text(success_message)
                     context.user_data['updating_measurements'] = False
                 else:
                     await update.message.reply_text("Нужно ввести ровно 4 замера через запятую.")
