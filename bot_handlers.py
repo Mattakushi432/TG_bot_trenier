@@ -3,6 +3,7 @@ from telegram.ext import ContextTypes
 from database import UserDatabase
 from gemini_client import GeminiClient
 import logging
+import re
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -11,6 +12,27 @@ logger = logging.getLogger(__name__)
 # Инициализация компонентов
 db = UserDatabase()
 gemini = GeminiClient()
+
+def clean_text_for_telegram(text):
+    """Очистка текста от проблемных символов для Telegram"""
+    if not text:
+        return text
+    
+    # Убираем проблемные символы Markdown
+    text = text.replace('*', '')
+    text = text.replace('_', '')
+    text = text.replace('`', '')
+    text = text.replace('[', '')
+    text = text.replace(']', '')
+    
+    # Убираем HTML теги если есть
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Ограничиваем длину сообщения (Telegram лимит 4096 символов)
+    if len(text) > 4000:
+        text = text[:4000] + "\n\n... (сообщение обрезано)"
+    
+    return text
 
 # Состояния для онбординга
 ONBOARDING_STATES = {
@@ -239,7 +261,9 @@ async def handle_workout_plan(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Сохраняем план в базу данных
         db.save_workout_plan(user_id, {'plan': workout_plan, 'type': 'workout'})
         
-        await update.message.reply_text(workout_plan, parse_mode='Markdown')
+        # Очищаем и отправляем план
+        clean_plan = clean_text_for_telegram(workout_plan)
+        await update.message.reply_text(clean_plan)
         
     except Exception as e:
         logger.error(f"Ошибка генерации плана тренировок: {e}")
@@ -258,7 +282,8 @@ async def handle_nutrition_plan(update: Update, context: ContextTypes.DEFAULT_TY
     
     try:
         nutrition_plan = gemini.calculate_nutrition(user_data)
-        await update.message.reply_text(nutrition_plan, parse_mode='Markdown')
+        clean_plan = clean_text_for_telegram(nutrition_plan)
+        await update.message.reply_text(clean_plan)
         
     except Exception as e:
         logger.error(f"Ошибка расчета питания: {e}")
@@ -277,7 +302,8 @@ async def handle_supplements(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         supplements = gemini.recommend_supplements(user_data)
-        await update.message.reply_text(supplements, parse_mode='Markdown')
+        clean_supplements = clean_text_for_telegram(supplements)
+        await update.message.reply_text(clean_supplements)
         
     except Exception as e:
         logger.error(f"Ошибка подбора добавок: {e}")
@@ -380,7 +406,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⏳ Думаю над ответом...")
                 try:
                     response = gemini.generate_response(user_data, text)
-                    await update.message.reply_text(response, parse_mode='Markdown')
+                    # Очищаем ответ от проблемных символов
+                    clean_response = clean_text_for_telegram(response)
+                    await update.message.reply_text(clean_response)
                 except Exception as e:
                     logger.error(f"Ошибка генерации ответа: {e}")
                     await update.message.reply_text("Произошла ошибка. Попробуй переформулировать вопрос.")
