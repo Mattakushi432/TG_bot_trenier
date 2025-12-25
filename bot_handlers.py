@@ -91,6 +91,7 @@ ONBOARDING_STATES = {
     'FITNESS_LEVEL': 'fitness_level',
     'GOAL': 'goal',
     'LOCATION': 'location',
+    'WORKOUTS_PER_WEEK': 'workouts_per_week',
     'INJURIES': 'injuries'
 }
 
@@ -265,6 +266,28 @@ async def handle_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         await update.message.reply_text(
+            "Сколько раз в неделю ты можешь тренироваться?",
+            reply_markup=ReplyKeyboardMarkup([
+                [KeyboardButton("2 раза"), KeyboardButton("3 раза")],
+                [KeyboardButton("4 раза"), KeyboardButton("5+ раз")]
+            ], resize_keyboard=True)
+        )
+        context.user_data['onboarding_state'] = ONBOARDING_STATES['WORKOUTS_PER_WEEK']
+    
+    elif state == ONBOARDING_STATES['WORKOUTS_PER_WEEK']:
+        if "2 раза" in text:
+            user_info['workouts_per_week'] = 2
+        elif "3 раза" in text:
+            user_info['workouts_per_week'] = 3
+        elif "4 раза" in text:
+            user_info['workouts_per_week'] = 4
+        elif "5+ раз" in text:
+            user_info['workouts_per_week'] = 5
+        else:
+            await update.message.reply_text("Пожалуйста, выбери количество тренировок из предложенных вариантов.")
+            return
+        
+        await update.message.reply_text(
             "Есть ли у тебя травмы или ограничения? (напиши 'нет' если их нет)"
         )
         context.user_data['onboarding_state'] = ONBOARDING_STATES['INJURIES']
@@ -280,9 +303,12 @@ async def handle_onboarding(update: Update, context: ContextTypes.DEFAULT_TYPE):
         del context.user_data['user_info']
         
         coach_name = "Ронни Коулман" if user_info['gender'] == 'male' else "Дженет Лайог"
+        workouts_text = f"{user_info['workouts_per_week']} раз в неделю"
+        
         success_message = (
             f"🎉 Отлично! Регистрация завершена!\n\n"
             f"Теперь я, {coach_name}, буду твоим персональным тренером.\n"
+            f"Учту, что ты можешь тренироваться {workouts_text}.\n"
             f"Готов создать для тебя индивидуальную программу! 💪"
         )
         

@@ -31,6 +31,7 @@ def test_database():
         'fitness_level': 'intermediate',
         'goal': 'fitness',
         'location': 'gym',
+        'workouts_per_week': 3,
         'injuries': None
     }
     
@@ -255,6 +256,7 @@ def demo_user_flow():
         'fitness_level': 'beginner',
         'goal': 'fitness',
         'location': 'home',
+        'workouts_per_week': 2,
         'injuries': None
     }
     

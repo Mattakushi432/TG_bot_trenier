@@ -28,6 +28,7 @@ class UserDatabase:
                     fitness_level TEXT,
                     goal TEXT,
                     location TEXT,
+                    workouts_per_week INTEGER,
                     injuries TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -67,8 +68,8 @@ class UserDatabase:
             cursor.execute('''
                 INSERT OR REPLACE INTO users 
                 (user_id, username, gender, age, height, weight, measurements, 
-                 fitness_level, goal, location, injuries, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 fitness_level, goal, location, workouts_per_week, injuries, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 user_data['user_id'],
                 user_data.get('username'),
@@ -80,6 +81,7 @@ class UserDatabase:
                 user_data.get('fitness_level'),
                 user_data.get('goal'),
                 user_data.get('location'),
+                user_data.get('workouts_per_week'),
                 user_data.get('injuries'),
                 datetime.now()
             ))

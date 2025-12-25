@@ -33,6 +33,7 @@ async def test_bot_components():
             'fitness_level': 'intermediate',
             'goal': 'fitness',
             'location': 'gym',
+            'workouts_per_week': 3,
             'injuries': None
         }
         
