@@ -28,11 +28,58 @@ def clean_text_for_telegram(text):
     # Убираем HTML теги если есть
     text = re.sub(r'<[^>]+>', '', text)
     
-    # Ограничиваем длину сообщения (Telegram лимит 4096 символов)
-    if len(text) > 4000:
-        text = text[:4000] + "\n\n... (сообщение обрезано)"
-    
     return text
+
+def split_long_message(text, max_length=4000):
+    """Разбивка длинного сообщения на части"""
+    if len(text) <= max_length:
+        return [text]
+    
+    parts = []
+    current_part = ""
+    
+    # Разбиваем по абзацам
+    paragraphs = text.split('\n\n')
+    
+    for paragraph in paragraphs:
+        # Если добавление абзаца превысит лимит
+        if len(current_part) + len(paragraph) + 2 > max_length:
+            if current_part:
+                parts.append(current_part.strip())
+                current_part = paragraph
+            else:
+                # Если один абзац слишком длинный, разбиваем по предложениям
+                sentences = paragraph.split('. ')
+                for sentence in sentences:
+                    if len(current_part) + len(sentence) + 2 > max_length:
+                        if current_part:
+                            parts.append(current_part.strip())
+                            current_part = sentence
+                        else:
+                            # Если предложение слишком длинное, обрезаем
+                            parts.append(sentence[:max_length-50] + "...")
+                    else:
+                        current_part += sentence + ". "
+        else:
+            current_part += paragraph + "\n\n"
+    
+    if current_part.strip():
+        parts.append(current_part.strip())
+    
+    return parts
+
+async def send_long_message(update, text):
+    """Отправка длинного сообщения частями"""
+    clean_text = clean_text_for_telegram(text)
+    parts = split_long_message(clean_text)
+    
+    for i, part in enumerate(parts):
+        if i == 0:
+            await update.message.reply_text(part)
+        else:
+            # Добавляем номер части для длинных сообщений
+            part_header = f"📄 Часть {i+1}/{len(parts)}:\n\n"
+            await update.message.reply_text(part_header + part)
 
 # Состояния для онбординга
 ONBOARDING_STATES = {
@@ -261,9 +308,8 @@ async def handle_workout_plan(update: Update, context: ContextTypes.DEFAULT_TYPE
         # Сохраняем план в базу данных
         db.save_workout_plan(user_id, {'plan': workout_plan, 'type': 'workout'})
         
-        # Очищаем и отправляем план
-        clean_plan = clean_text_for_telegram(workout_plan)
-        await update.message.reply_text(clean_plan)
+        # Отправляем план частями если он длинный
+        await send_long_message(update, workout_plan)
         
     except Exception as e:
         logger.error(f"Ошибка генерации плана тренировок: {e}")
@@ -282,8 +328,7 @@ async def handle_nutrition_plan(update: Update, context: ContextTypes.DEFAULT_TY
     
     try:
         nutrition_plan = gemini.calculate_nutrition(user_data)
-        clean_plan = clean_text_for_telegram(nutrition_plan)
-        await update.message.reply_text(clean_plan)
+        await send_long_message(update, nutrition_plan)
         
     except Exception as e:
         logger.error(f"Ошибка расчета питания: {e}")
@@ -302,8 +347,7 @@ async def handle_supplements(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         supplements = gemini.recommend_supplements(user_data)
-        clean_supplements = clean_text_for_telegram(supplements)
-        await update.message.reply_text(clean_supplements)
+        await send_long_message(update, supplements)
         
     except Exception as e:
         logger.error(f"Ошибка подбора добавок: {e}")
@@ -406,9 +450,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text("⏳ Думаю над ответом...")
                 try:
                     response = gemini.generate_response(user_data, text)
-                    # Очищаем ответ от проблемных символов
-                    clean_response = clean_text_for_telegram(response)
-                    await update.message.reply_text(clean_response)
+                    # Отправляем ответ частями если он длинный
+                    await send_long_message(update, response)
                 except Exception as e:
                     logger.error(f"Ошибка генерации ответа: {e}")
                     await update.message.reply_text("Произошла ошибка. Попробуй переформулировать вопрос.")
