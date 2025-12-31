@@ -29,7 +29,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-📖 **Подробная инструкция**: [QUICK_START.md](QUICK_START.md)
 
 ## Особенности
 
