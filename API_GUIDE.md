@@ -12,7 +12,7 @@
 4. Скопируйте полученный токен
 5. Вставьте токен в файл `.env`:
    ```
-   TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+   TELEGRAM_BOT_TOKEN=your_telegram_bot_token
    ```
 
 ### 2. Google Gemini API Key
@@ -24,7 +24,7 @@
 5. Скопируйте созданный ключ
 6. Вставьте ключ в файл `.env`:
    ```
-   GEMINI_API_KEY=AIzaSyABC123def456GHI789jkl
+    GEMINI_API_KEY=your_gemini_api_key
    ```
 
 ## Настройка бота в Telegram
